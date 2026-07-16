@@ -1,0 +1,38 @@
+name: packing-app
+
+services:
+  packing-service:
+    image: 192.168.20.156:5000/packing-service:latest
+    ports:
+      - "8101:8101"
+    environment:
+      MYSQL_HOST: 192.168.20.156
+      MYSQL_ROOT_PASSWORD: 123456
+      PYTHON_API_HOST: http://packing-app
+      PYTHON_API_PORT: 5000
+    volumes:
+      - packing_data:/data
+    networks:
+      - app_network
+    restart: unless-stopped
+
+  packing-app:
+    image: 192.168.20.156:5000/packing-app:latest
+    ports:
+      - "5001:5000"
+    environment:
+      JAVA_SERVICE_HOST: http://packing-service:8101
+    volumes:
+      - ./static/images:/app/static/images
+    depends_on:
+      - packing-service
+    networks:
+      - app_network
+    restart: unless-stopped
+
+volumes:
+  packing_data:
+
+networks:
+  app_network:
+    driver: bridge

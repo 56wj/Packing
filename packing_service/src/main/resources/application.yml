@@ -1,0 +1,44 @@
+packing-python-api:
+#  host: http://localhost #部署凯利
+#  host: http://106.12.166.210  #本地
+  host: http://10.131.131.177  #本地
+#  host: http://10.1.121.26  #本地
+  port: 5000
+  route: /api
+  methods: GET
+
+  source_save_path: D:\KinLead_packing_TempLoad\source\  #本地
+  result_save_path: D:\KinLead_packing_TempLoad\result\  #本地
+  middle_save_path: D:\KinLead_packing_TempLoad\middle\  #本地
+  push_save_path: D:\KinLead_packing_TempLoad\push\  #本地
+  image_path: \images\  #本地
+#  source_save_path: /usr/workspace/KinLead/KinLead_packing_TempLoad/source/ #部署凯利
+#  result_save_path: /usr/workspace/KinLead/KinLead_packing_TempLoad/result/  #部署凯利
+#  middle_save_path: /usr/workspace/KinLead/KinLead_packing_TempLoad/middle/ #部署凯利
+#  push_save_path: /usr/workspace/KinLead/KinLead_packing_TempLoad/push/  #部署凯利
+#  image_path: /usr/workspace/KinLead/python/py3dbp/dist/api_test/_internal/static/images/ #部署凯利
+
+spring:
+  datasource:
+#    url: jdbc:mysql://localhost:33306/db_kindlead?useUnicode=true&characterEncoding=utf-8&serverTimezone=UTC
+    url: jdbc:mysql://10.131.131.110:33306/db_kindlead?useUnicode=true&characterEncoding=utf-8&serverTimezone=UTC
+    username: root
+    password: 123456
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  application:
+    name: test-serice
+
+
+server:
+  port: 8101
+
+mybatis:
+  configuration:
+    map-underscore-to-camel-case: true
+
+logging:
+  level:
+    root: INFO
+  file:
+    name: D:\Study Space\test\myapp.log

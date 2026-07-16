@@ -1,0 +1,27 @@
+.DS_Store
+
+# Logs
+*.log
+logs/
+
+# Node / Vue
+node_modules/
+packing_service_frontend/dist/
+packing_service_frontend/.cache/
+
+# Java / Maven
+target/
+*.class
+*.iml
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Runtime data
+data/
+tmp/
+temp/

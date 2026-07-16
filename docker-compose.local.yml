@@ -1,0 +1,86 @@
+name: packing-local
+
+services:
+  mysql:
+    image: docker.1ms.run/library/mysql:8.0
+    platform: linux/arm64/v8
+    ports:
+      - "33306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: 123456
+      MYSQL_DATABASE: db_kindlead
+      TZ: Asia/Shanghai
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-time-zone=+08:00
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./deploy/mysql/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p123456"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  packing-service:
+    build:
+      context: ./packing_service
+      dockerfile: Dockerfile
+    ports:
+      - "8101:8101"
+    environment:
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_DB: db_kindlead
+      MYSQL_USER: root
+      MYSQL_ROOT_PASSWORD: 123456
+      PYTHON_API_HOST: http://packing-python
+      PYTHON_API_PORT: 5000
+      TZ: Asia/Shanghai
+    volumes:
+      - packing_data:/data
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: unless-stopped
+
+  packing-python:
+    build:
+      context: ./py3dbp
+      dockerfile: Dockerfile
+    ports:
+      - "5001:5000"
+    environment:
+      INTERNAL_API_BASE_URL: http://packing-service:8101
+      TZ: Asia/Shanghai
+    volumes:
+      - packing_data:/data
+      - packing_images:/app/static/images
+    depends_on:
+      - packing-service
+    restart: unless-stopped
+
+  packing-frontend:
+    build:
+      context: ./packing_service_frontend
+      dockerfile: dockerfile
+    ports:
+      - "9528:9528"
+    environment:
+      VUE_APP_BASE_API: /dev-api
+      VUE_APP_PROXY_TARGET: http://packing-service:8101
+      VUE_APP_WS_URL: ws://localhost:8101/
+      VUE_APP_HTTP_URL: http://localhost:5001
+      CHOKIDAR_USEPOLLING: "true"
+      TZ: Asia/Shanghai
+    depends_on:
+      - packing-service
+      - packing-python
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
+  packing_data:
+  packing_images:
