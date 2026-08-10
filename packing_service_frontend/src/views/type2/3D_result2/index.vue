@@ -303,6 +303,7 @@ import { mockData } from './mockData'
 import { realData } from './realData'
 // import { PackagePreview3DInit } from '@/3D/pallet'
 import { PackagePreview3DInit } from '@/3D/pallet2'
+import { getAssetFileName, getAssetUrl } from '@/utils/asset-url'
 export default {
     name: '3D_result2',
     data() {
@@ -342,7 +343,7 @@ export default {
         },
         bin_change() {
             var bin = this.$data.form.bin;
-            this.$data.pictureUrl = process.env.VUE_APP_HTTP_URL + "/" + this.$data.chart_data[bin]["picture_address"];
+            this.$data.pictureUrl = getAssetUrl(this.$data.chart_data[bin]["picture_address"]);
             // this.$data.form.number = this.$data.chart_data[bin]["item_number"];
             // this.$data.form.trayNumber = this.$data.chart_data[bin]["tray_number"];
             // this.$data.bin_height = this.$data.chart_data[bin]["bin_height"];
@@ -421,8 +422,8 @@ export default {
             var data = { taskId: this.$data.form.taskId };
             try {
                 const res = await get_result(data);
-                var url = process.env.VUE_APP_HTTP_URL + "/" + res.data.resultJson.excel_address;
-                var fileName = res.data.resultJson.excel_address.split("/").pop();
+                var url = getAssetUrl(res.data.resultJson.excel_address);
+                var fileName = getAssetFileName(res.data.resultJson.excel_address);
                 console.log(url)
                 console.log(fileName)
                 const link = document.createElement('a');

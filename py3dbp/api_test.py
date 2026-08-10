@@ -337,6 +337,28 @@ def task_to_run2(receive_data):
         return 0
 
 
+def select_suspend_result_legacy(results):
+    max_result = None
+    for result in results:
+        if max_result is None:
+            max_result = result
+        elif result["remain_items_count"] < max_result["remain_items_count"]:
+            print(f"legacy选用{result.get('algo_name')}后剩余{result['remain_items_count']}")
+            max_result = result
+    return max_result
+
+
+def select_suspend_result(results):
+    return min(
+        results,
+        key=lambda result: (
+            result.get("has_enclosed_hole", False),
+            result["remain_items_count"],
+            result.get("enclosed_hole_area", 0)
+        )
+    )
+
+
 def task_to_run3(receive_data):
     request_data = receive_data.get('data')
     # tray_id = request_data.get('config')
@@ -371,19 +393,39 @@ def task_to_run3(receive_data):
         return jsonify({"error": f"API request failed with status code {response.status_code}"})
 
     print('开始计算')
-    max_result = None
     suspend_pack_instance = SuspendPack(request_data, truck_size_data, task_id, arrive_date, tube_size_data)
     algos = [MaxRectsBlsf, MaxRectsBaf, MaxRectsBssf, MaxRectsBbef, MaxRectsBiof]
     # algos = [MaxRectsBiof]
+    candidate_results = []
     for algo in algos:
         result = suspend_pack_instance.pack(algo=algo)
         print(str(algo) + "  :  " + str(result))
-        if max_result is None:
-            max_result = result
-        else:
-            if result["remain_items_count"] < max_result["remain_items_count"]:
-                print(f"选用{algo}后剩余{result['remain_items_count']}")
-                max_result = result
+        candidate_results.append(result)
+
+    legacy_result = select_suspend_result_legacy(candidate_results)
+    if os.getenv("SUSPEND_USE_LEGACY_SELECTOR", "").strip() == "1":
+        max_result = legacy_result
+        max_result["selection_mode"] = "legacy_remain_items_count"
+    else:
+        max_result = select_suspend_result(candidate_results)
+        max_result["selection_mode"] = "no_enclosed_hole_first"
+        max_result["legacy_selected_algo"] = legacy_result.get("algo_name")
+        max_result["legacy_has_enclosed_hole"] = legacy_result.get("has_enclosed_hole", False)
+        max_result["candidate_layout_checks"] = [
+            {
+                "algo_name": item.get("algo_name"),
+                "remain_items_count": item.get("remain_items_count"),
+                "has_enclosed_hole": item.get("has_enclosed_hole", False),
+                "enclosed_hole_area": item.get("enclosed_hole_area", 0)
+            }
+            for item in candidate_results
+        ]
+    print(
+        f"最终选用{max_result.get('algo_name')}, "
+        f"剩余{max_result['remain_items_count']}, "
+        f"存在空洞: {max_result.get('has_enclosed_hole')}, "
+        f"选择模式: {max_result.get('selection_mode')}"
+    )
     result = json.dumps(max_result, ensure_ascii=False)
     print(result)
     print(f"计算完成")

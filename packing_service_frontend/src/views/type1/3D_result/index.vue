@@ -356,6 +356,7 @@ import 'echarts-gl'
 // import { get_latestTask } from '@/api/type1'
 import store from '@/store'
 import { dataList } from './data'
+import { getAssetFileName, getAssetUrl } from '@/utils/asset-url'
 export default {
     name: '3D_result',
     data() {
@@ -406,7 +407,7 @@ export default {
                 var detail = that.$data.chart_data[that.$data.form.bin][j]
                 // 在新标签页中打开detail的图片连接
                 // window.open("http://106.12.166.210:9001/"+detail[i].address)
-                window.open(process.env.VUE_APP_HTTP_URL+"/"+detail[i].address)
+                window.open(getAssetUrl(detail[i].address))
 	        });
             var option;
             var that = this;
@@ -433,8 +434,9 @@ export default {
                         // res+="<a href='http://106.12.166.210:9001" + "/" +detail[i].address + "' target='_blank'>装箱效果图</a>";
                         // res += "<img style='width:180px;height:150px;' src='http://192.168.20.172:9527" + "/" + detail[i].address + "'/>";
                         // res+="<a href='http://192.168.20.172:9527" + "/" +detail[i].address + "' target='_blank'>装箱效果图</a>";
-                        res += "<img style='width:180px;height:150px;' src='" + process.env.VUE_APP_HTTP_URL + "/" + detail[i].address + "'/>";
-                        res+="<a href='" + process.env.VUE_APP_HTTP_URL + "/" +detail[i].address + "' target='_blank'>装箱效果图</a>";
+                        var assetUrl = getAssetUrl(detail[i].address)
+                        res += "<img style='width:180px;height:150px;' src='" + assetUrl + "'/>";
+                        res+="<a href='" + assetUrl + "' target='_blank'>装箱效果图</a>";
                         // console.log(store.getters.url+"/"+detail[i].address)
                         return detail[i].value[2] != 0 ? res : "顶部";
                     },
@@ -664,8 +666,8 @@ export default {
             var data = { taskId: this.$data.form.taskId };
             try {
                 const res = await get_result(data);
-                var url = process.env.VUE_APP_HTTP_URL + "/" + res.data.resultJson.excel_address;
-                var fileName = res.data.resultJson.excel_address.split("/").pop();
+                var url = getAssetUrl(res.data.resultJson.excel_address);
+                var fileName = getAssetFileName(res.data.resultJson.excel_address);
                 console.log(url)
                 console.log(fileName)
                 const link = document.createElement('a');

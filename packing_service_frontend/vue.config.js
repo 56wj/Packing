@@ -28,7 +28,7 @@ module.exports = {
   // publicPath: process.env.NODE_ENV === "production" ? "/palletpack" : "/",
   outputDir: 'dist',
   assetsDir: 'static',
-  lintOnSave: process.env.NODE_ENV === 'development',
+  lintOnSave: process.env.LINT_ON_SAVE === 'true',
   productionSourceMap: false,
   devServer: {
     // host: 'localhost',
@@ -47,6 +47,10 @@ module.exports = {
           // /dev-api/vue-admin-template/user/login ---> /user/login
           ['^' + process.env.VUE_APP_BASE_API]: ''
         }
+      },
+      '/images': {
+        target: process.env.VUE_APP_ASSET_PROXY_TARGET || process.env.VUE_APP_HTTP_URL || 'http://localhost:5001',
+        changeOrigin: true
       }
     }
     // before: require('./mock/mock-server.js') //开启mock服务器

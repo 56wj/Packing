@@ -97,6 +97,7 @@ import store from '@/store'
 // import download from 'downloadjs'
 import { mapGetters } from 'vuex'
 import * as xlsx from 'xlsx/xlsx.mjs'
+import { getAssetFileName, getAssetUrl } from '@/utils/asset-url'
 
 
 export default {
@@ -167,8 +168,8 @@ export default {
         const res = await get_result(data);
         // var url = store.getters.url + "/" + res.data.resultJson.excel_address;
         // var url = "http://106.12.166.210:9001" + "/" + res.data.resultJson.excel_address;
-        var url = process.env.VUE_APP_HTTP_URL + "/" + res.data.resultJson.excel_address;
-        var fileName = res.data.resultJson.excel_address.split("/").pop();
+        var url = getAssetUrl(res.data.resultJson.excel_address);
+        var fileName = getAssetFileName(res.data.resultJson.excel_address);
         console.log(url)
         console.log(fileName)
         const link = document.createElement('a');
