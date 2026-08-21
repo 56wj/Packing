@@ -71,8 +71,9 @@ services:
     environment:
       VUE_APP_BASE_API: /dev-api
       VUE_APP_PROXY_TARGET: http://packing-service:8101
+      VUE_APP_ASSET_PROXY_TARGET: http://packing-python:5000
       VUE_APP_WS_URL: ws://localhost:8101/
-      VUE_APP_HTTP_URL: http://localhost:5001
+      VUE_APP_HTTP_URL: http://localhost:9528
       CHOKIDAR_USEPOLLING: "true"
       TZ: Asia/Shanghai
     depends_on:

@@ -21,7 +21,7 @@ services:
     ports:
       - "5001:5000"
     environment:
-      JAVA_SERVICE_HOST: http://packing-service:8101
+      INTERNAL_API_BASE_URL: http://packing-service:8101
     volumes:
       - ./static/images:/app/static/images
     depends_on:

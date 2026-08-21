@@ -43,6 +43,88 @@ def color_gradient(value):
     return hex_color
 
 
+def _unique_sorted(values, eps=1e-6):
+    values = sorted(values)
+    unique_values = []
+    for value in values:
+        if not unique_values or abs(value - unique_values[-1]) > eps:
+            unique_values.append(value)
+    return unique_values
+
+
+def analyze_enclosed_holes(bin_width, bin_length, placed_items):
+    x_coords = [0, bin_width]
+    y_coords = [0, bin_length]
+    rectangles = []
+
+    for item in placed_items:
+        left = max(0, item["position_x"])
+        bottom = max(0, item["position_y"])
+        right = min(bin_width, left + item["length"])
+        top = min(bin_length, bottom + item["width"])
+        if right <= left or top <= bottom:
+            continue
+        rectangles.append((left, bottom, right, top))
+        x_coords.extend([left, right])
+        y_coords.extend([bottom, top])
+
+    xs = _unique_sorted(x_coords)
+    ys = _unique_sorted(y_coords)
+    column_count = len(xs) - 1
+    row_count = len(ys) - 1
+
+    if column_count <= 0 or row_count <= 0:
+        return {"has_enclosed_hole": False, "enclosed_hole_area": 0}
+
+    occupied = [[False] * column_count for _ in range(row_count)]
+    for row in range(row_count):
+        cy = (ys[row] + ys[row + 1]) / 2
+        for col in range(column_count):
+            cx = (xs[col] + xs[col + 1]) / 2
+            for left, bottom, right, top in rectangles:
+                if left <= cx < right and bottom <= cy < top:
+                    occupied[row][col] = True
+                    break
+
+    visited = [[False] * column_count for _ in range(row_count)]
+    queue = []
+
+    def enqueue(row, col):
+        if row < 0 or row >= row_count or col < 0 or col >= column_count:
+            return
+        if occupied[row][col] or visited[row][col]:
+            return
+        visited[row][col] = True
+        queue.append((row, col))
+
+    for col in range(column_count):
+        enqueue(0, col)
+        enqueue(row_count - 1, col)
+    for row in range(row_count):
+        enqueue(row, 0)
+        enqueue(row, column_count - 1)
+
+    head = 0
+    while head < len(queue):
+        row, col = queue[head]
+        head += 1
+        enqueue(row - 1, col)
+        enqueue(row + 1, col)
+        enqueue(row, col - 1)
+        enqueue(row, col + 1)
+
+    enclosed_hole_area = 0
+    for row in range(row_count):
+        for col in range(column_count):
+            if not occupied[row][col] and not visited[row][col]:
+                enclosed_hole_area += (xs[col + 1] - xs[col]) * (ys[row + 1] - ys[row])
+
+    return {
+        "has_enclosed_hole": enclosed_hole_area > 0,
+        "enclosed_hole_area": round(enclosed_hole_area, 2)
+    }
+
+
 def create_material_excel(material_list, task_id, order_id, date, algo_name):
     # 创建一个新的工作簿
     workbook = openpyxl.Workbook()
@@ -331,6 +413,9 @@ class SuspendPack:
         # 清除耗材清单(为了后续统计仅装入的)
         self.material_list = []
 
+        has_enclosed_hole = False
+        enclosed_hole_area = 0
+
         # 每个容器
         for i, b in enumerate(self.bin_list_with_n):
             bin_width, bin_length, bin_height, bin_max_weight, bin_name = b
@@ -406,7 +491,15 @@ class SuspendPack:
             fig.savefig(save_dir)
             print(f'图像已保存到: {save_dir}')
             save_dir = build_asset_path('images', self.task_id, f'{algo_name}_bin{i + 1}.png')
-            result[f'bin{i}'] = {'container': bin_data, 'placed_items': bin_result, 'picture_address': save_dir}
+            layout_check = analyze_enclosed_holes(bin_width, bin_length, bin_result)
+            has_enclosed_hole = has_enclosed_hole or layout_check["has_enclosed_hole"]
+            enclosed_hole_area += layout_check["enclosed_hole_area"]
+            result[f'bin{i}'] = {
+                'container': bin_data,
+                'placed_items': bin_result,
+                'picture_address': save_dir,
+                'layout_check': layout_check
+            }
         self.material_list = sorted(self.material_list, key=lambda x: x['name'])
         save_path = create_material_excel(self.material_list, self.task_id, self.order_id, self.arrive_date, algo_name)
         result['excel_address'] = save_path
@@ -417,6 +510,9 @@ class SuspendPack:
         result['remain_items'] = unpack_item_info
         result['remain_items_count'] = packer._unpack_item_count
         result['all_number'] = self.item_count
+        result['has_enclosed_hole'] = has_enclosed_hole
+        result['enclosed_hole_area'] = round(enclosed_hole_area, 2)
+        result['algo_name'] = algo_name
         return result
 
 
