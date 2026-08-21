@@ -10,6 +10,7 @@ import cn.edu.hdu.packing_service.config.PythonExecuteConfig;
 import cn.edu.hdu.packing_service.service.TaskService;
 import cn.edu.hdu.packing_service.stream.PalletPackingWebsocket;
 import cn.edu.hdu.packing_service.utils.DateUtil;
+import cn.edu.hdu.packing_service.utils.PalletPackingConfigValidator;
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.parser.Feature;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -55,6 +56,11 @@ public class PalletPackingController {
         System.out.println(DateUtil.getNowTime() + " - " + "获取到一阶段计算任务请求");
         if (!json.containsKey("data")) {
             return Result.error("The request doesn't contain a 'data' key.");
+        }
+
+        String configError = PalletPackingConfigValidator.validateRequest(json);
+        if (configError != null) {
+            return Result.error(configError);
         }
 
         // 获取orderID
@@ -152,6 +158,10 @@ public class PalletPackingController {
         }
 
         JSONObject sourceJsonObj = JSONObject.parseObject(sourceJson, Feature.OrderedField);
+        String configError = PalletPackingConfigValidator.validateData(sourceJsonObj);
+        if (configError != null) {
+            return Result.error(configError);
+        }
         //将middleJsonData 转为JSONObject 格式
         JSONObject middleJsonObj = new JSONObject(middleJsonData);
 
