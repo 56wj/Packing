@@ -121,6 +121,14 @@
             </el-col>
           </el-row>
           <el-divider content-position="left">叠膜设置</el-divider>
+          <el-alert
+            class="overlap-rule-tip"
+            title="高度统一填 cm：规格宽度780mm按78cm判断，700mm按70cm判断"
+            description="“单层上限”只决定该规格能否参与叠膜；实际叠膜还要满足同规格、非混装小托且叠后膜卷本体总高度不超过“总高度上限”。两个上限均不含托盘和泡沫高度。"
+            type="info"
+            :closable="false"
+            show-icon>
+          </el-alert>
           <el-row>
             <el-col :span=12>
               <el-form-item label="可否膜叠膜：" label-width="220px">
@@ -139,10 +147,13 @@
           </el-row>
           <el-row>
             <el-col :span=12>
-              <el-form-item label="单个膜叠膜最大高度(cm)：" key="1" label-width="220px">
-                <el-input placeholder="请输入" v-model.number="form.single_max_height" style="width: 250px" clearable
+              <el-form-item label="单层膜卷本体高度上限(cm)：" key="1" label-width="270px" prop="single_max_height">
+                <el-input placeholder="例如 70（等于700mm）" v-model.number="form.single_max_height" style="width: 250px" clearable
                   :disabled="!form.overlap">
                 </el-input>
+                <span v-if="form.overlap && heightCmToMm(form.single_max_height) !== null" class="height-conversion-tip">
+                  = {{ heightCmToMm(form.single_max_height) }} mm
+                </span>
               </el-form-item>
               <!-- <el-form-item label="单个膜叠膜最大高度(cm)：" key="2" v-else label-width="220px" prop="single_max_height">
                 <el-input placeholder="请输入" v-model.number="form.single_max_height" style="width: 250px" clearable>
@@ -150,10 +161,13 @@
               </el-form-item> -->
             </el-col>
             <el-col :span=12>
-              <el-form-item label="总体膜叠膜最大高度(cm)：" key="1" label-width="220px">
-                <el-input placeholder="请输入" v-model.number="form.entire_max_height" style="width: 250px" clearable
+              <el-form-item label="叠后膜卷本体总高度上限(cm)：" key="1" label-width="270px" prop="entire_max_height">
+                <el-input placeholder="例如 140（等于1400mm）" v-model.number="form.entire_max_height" style="width: 250px" clearable
                   :disabled="!form.overlap">
                 </el-input>
+                <span v-if="form.overlap && heightCmToMm(form.entire_max_height) !== null" class="height-conversion-tip">
+                  = {{ heightCmToMm(form.entire_max_height) }} mm
+                </span>
               </el-form-item>
               <!-- <el-form-item label="总体膜叠膜最大高度(cm)：" key="2" v-else label-width="220px" prop="entire_max_height">
                 <el-input placeholder="请输入" v-model.number="form.entire_max_height" style="width: 250px" clearable>
@@ -372,11 +386,20 @@ import { getToken } from '@/utils/auth'
 import { palletDataCheck }from '@/utils/inputCheck'
 import { create_palletroll } from '@/api/rollPallet'
 import { get_task } from '@/api/external'
+import { heightCmToMm, validateOverlapConfig, validateOverlapHeightValue } from '@/utils/overlapValidation'
 
 
 export default {
   name: 'get_data',
   data() {
+    const overlapHeightValidator = (fieldLabel) => (rule, value, callback) => {
+      if (!this.form.overlap) {
+        callback()
+        return
+      }
+      const message = validateOverlapHeightValue(value, fieldLabel)
+      message ? callback(new Error(message)) : callback()
+    }
     return {
       activeName: 'first',
       form: {
@@ -412,12 +435,10 @@ export default {
           // { len: 6, message: '请输入6位订单号', trigger: 'blur' }
         ],
         single_max_height: [
-          { required: true, message: '请输入高度(cm)', trigger: 'blur' },
-          { type: 'number', message: '高度必须为数字值' }
+          { validator: overlapHeightValidator('单层膜卷本体高度上限'), trigger: ['blur', 'change'] }
         ],
         entire_max_height: [
-          { required: true, message: '请输入高度(cm)', trigger: 'blur' },
-          { type: 'number', message: '高度必须为数字值' }
+          { validator: overlapHeightValidator('叠后膜卷本体总高度上限'), trigger: ['blur', 'change'] }
         ],
         beyond_height: [
           { required: true, message: '请输入高度(cm)', trigger: 'blur' },
@@ -502,6 +523,7 @@ export default {
     }
   },
   methods: {
+    heightCmToMm,
     async init() {
       try {
         const res = await get_box()
@@ -579,10 +601,10 @@ export default {
       // 上传失败
     },
     uploadData(param) {
-      var flag = true;
       this.$refs['form'].validate((valid) => {
         if(!valid){
-          alert("规则设置有误，请检查！");
+          this.activeName = 'first'
+          this.$message.error("规则设置有误，请检查红色提示项")
         }else if(palletDataCheck(this.$data.tableData)&&this.logicCheck()){
           console.log('submit!');
           this.to_upload();
@@ -927,14 +949,15 @@ export default {
       this.$data.form.default_density = save(num)
     },
     logicCheck() {
-      // min初始设为最大值
-      var min_h = 1000000;
-      this.$data.form.box_list.forEach((item) => {
-        // 判断最小值
-        min_h = Math.min(min_h, this.options_box_type.find(item2 => item2.value == item.box_id).height)
-      })
-      if(this.$data.form.single_max_height > min_h*100 || this.$data.form.entire_max_height > min_h*100){
-        alert("叠膜高度超过车箱高度，请检查！");
+      const selectedVehicleHeights = this.$data.form.box_list
+        .map(item => this.options_box_type.find(option => option.value == item.box_id))
+        .filter(Boolean)
+        .map(option => Number(option.height) * 100)
+      const minVehicleHeightCm = selectedVehicleHeights.length ? Math.min(...selectedVehicleHeights) : null
+      const overlapError = validateOverlapConfig(this.$data.form, minVehicleHeightCm)
+      if (overlapError) {
+        this.activeName = 'first'
+        this.$message.error(overlapError)
         return false
       }
       return true;
@@ -975,6 +998,9 @@ export default {
         this.$data.input_overlap = false
       } else {
         this.$data.input_overlap = true
+        this.$nextTick(() => {
+          this.$refs.form.clearValidate(['single_max_height', 'entire_max_height'])
+        })
       }
     },
     lying() {
@@ -1189,6 +1215,17 @@ export default {
 .el-tab-pane {
   height: 800px;
   overflow-y: auto;
+}
+
+.overlap-rule-tip {
+  width: calc(100% - 40px);
+  margin: 0 20px 20px;
+}
+
+.height-conversion-tip {
+  margin-left: 8px;
+  color: #606266;
+  white-space: nowrap;
 }
 
 // .el-form-item {
