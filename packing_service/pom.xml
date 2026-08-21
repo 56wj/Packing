@@ -107,6 +107,8 @@
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
+            <!-- 1.18.24与当前JDK 21的javac AST不兼容 -->
+            <version>1.18.32</version>
         </dependency>
 
         <!--validation-->

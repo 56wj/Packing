@@ -23,6 +23,7 @@ from typing import List, Tuple, Optional
 from functools import partial
 from collections import defaultdict
 from path_utils import get_static_images_dir, build_asset_path
+from overlap_rules import can_stack_layer, parse_overlap_limits_cm
 
 DEFAULT_NUMBER_OF_DECIMALS = 0
 START_POSITION = [0, 0, 0]
@@ -2182,6 +2183,8 @@ class OverlapHandler:
         if overlap_flag:
             print("膜叠膜处理：")
             self.packer[0].items.sort(key=return_height0, reverse=True)
+            if not self.packer[0].items:
+                return self.packer
             item_list = []
             now_tray = self.packer[0].items[0]
             h_count = now_tray.height - tray_height  # h_count统计未加上托盘的总高度
@@ -2215,7 +2218,13 @@ class OverlapHandler:
                     # pack_tray_list = []
                     count = 1
                 else:
-                    if now_tray.partno == i.partno and now_tray.height - tray_height - foam_height <= overlap_height and i.height - tray_height + h_count - (count + 1) * foam_height<= overlap_total_height:
+                    base_goods_height = now_tray.height - tray_height - foam_height
+                    candidate_goods_height = i.height - tray_height - foam_height
+                    stacked_goods_height = h_count - count * foam_height
+                    if can_stack_layer(
+                            now_tray.partno, i.partno, now_tray.is_mixed, i.is_mixed,
+                            base_goods_height, candidate_goods_height, stacked_goods_height,
+                            overlap_height, overlap_total_height):
                         h_count += i.height - tray_height
                         weight_count += i.weight - tray_weight
                         # pack_tray_list.append(i)
@@ -2901,13 +2910,7 @@ class PackAll:
         tray_height = int(tray_data['data']['palletHeight'] * 100)
         tray_weight = tray_data['data']['palletWeight']
         rule = data['config']['rule']
-        overlap_flag = data['config']['overlap']
-        if overlap_flag:
-            overlap_height = data['config']['single_max_height']
-            overlap_total_height = data['config']['entire_max_height']
-        else:
-            overlap_height = 0
-            overlap_total_height = 0
+        overlap_flag, overlap_height, overlap_total_height = parse_overlap_limits_cm(data['config'])
         lying_flag = data['config']['lying']
         lying_limit = int(data['config']['lying_limit'])
         lying_tray_flag = data['config']['lying_tray_flag']
