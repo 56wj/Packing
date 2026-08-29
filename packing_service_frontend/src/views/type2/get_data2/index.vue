@@ -287,6 +287,7 @@ import { getToken } from '@/utils/auth'
 import { palletDataCheck }from '@/utils/inputCheck'
 import { get_task } from '@/api/external'
 import { exit } from 'process'
+import ReconnectingWebSocket, { buildWebSocketUrl } from '@/utils/reconnectingWebSocket'
 
 export default {
   name: 'get_data',
@@ -845,54 +846,44 @@ export default {
       }
     },
     web_socket() {
-      var that = this
-      // 如果文件上传成功了 （后续此处补上文件是否上传成功、是否上传的判断）
-      if (typeof (WebSocket) == "undefined") {
-        alert("您的浏览器不支持WebSocket");
-        this.$data.wsp = true;
-        console.log("您的浏览器不支持WebSocket");
-      } else {
-        console.log("您的浏览器支持WebSocket");
+      const that = this
+      if (typeof WebSocket === 'undefined') {
+        this.$data.wsp = true
+        this.$message.error('当前浏览器不支持 WebSocket')
+        return
       }
-      // var ws = new WebSocket('ws://10.131.131.164:8101/palletpacking/1');
-      // var wsUrl = 'ws://10.131.131.132:8101/palletpackingWebsocket?token=' + getToken();
-      // var wsUrl = 'ws://106.12.166.210:9001/palletpackingWebsocket?token=' + getToken();
-      // var wsUrl = 'ws://192.168.20.172:9527/palletpackingWebsocket?token=' + getToken();
-      var wsUrl = process.env.VUE_APP_WS_URL+'palletpackingWebsocket?token=' + getToken();
-      var ws = new WebSocket(wsUrl);
 
-      var heartCheck = {
-        // 9分钟发起一次心跳，比Server端设置的连接时间稍微小一点，在接近断开的情况下以通信的方式去重置连接时间
-        timeout: 550000,
-        serverTimeoutObj: null,
-        reset: function () {
-            clearTimeout(this.serverTimeoutObj);
-            return this;
+      if (this.$data.ws && typeof this.$data.ws.close === 'function') {
+        this.$data.ws.close()
+      }
+      this.$data.wsp = true
+
+      const client = new ReconnectingWebSocket({
+        url: () => buildWebSocketUrl('/palletpackingWebsocket', getToken()),
+        onOpen: socket => {
+          console.log('WebSocket connected')
+          socket.send('from client: hello')
         },
-        start: function () {
-            this.serverTimeoutObj = setInterval(function () {
-                if (ws.readyState == 1) {
-                    console.log("连接状态，发送消息保持连接");
-                    ws.send("linkCheck");
-                    // 如果获取到消息，说明连接正常，重置心跳检测
-                    heartCheck.reset().start();
-                } else {
-                    console.log("断开连接，尝试重连");
-                    connect();
-                }
-            }, this.timeout)
-        }
-      };
-
-      this.$data.ws = ws
-      ws.onopen = function () {
-        console.log('ws onopen');
-        ws.send('from client: hello');
-      };
-      ws.onmessage = function (e) {
-        console.log('ws onmessage');
-        console.log(JSON.parse(e.data))
-        var res = JSON.parse(e.data)
+        onStatusChange: connected => {
+          that.$data.wsp = !connected
+        },
+        onReconnect: retryCount => {
+          if (retryCount === 1) {
+            that.$message({
+              message: 'WebSocket 连接中断，正在自动重连…',
+              type: 'warning',
+              duration: 3000
+            })
+          }
+        },
+        onMessage: e => {
+          let res
+          try {
+            res = JSON.parse(e.data)
+          } catch (error) {
+            console.error('WebSocket 消息解析失败', error, e.data)
+            return
+          }
         // 这里要做一个code的判断 一阶段
         if (res.code == 20001 && res.data.taskId == that.$data.taskId) {
         // if (res.code == 20001) {
@@ -917,14 +908,11 @@ export default {
           that.$data.loading2 = false;
           that.$data.dialogTableVisible = false;
         }
-      };
-      ws.onclose = function () {
-      };
-      ws.onerror = function (error) {
-        alert("wsl连接失败，请刷新页面重试");
-        that.$data.wsp = true;
-        console.log(error)
-      }
+        }
+      })
+
+      this.$data.ws = client
+      client.connect()
     }
   },
   created() {
@@ -939,6 +927,11 @@ export default {
   },
   mounted() {
     this.web_socket()
+  },
+  beforeDestroy() {
+    if (this.$data.ws && typeof this.$data.ws.close === 'function') {
+      this.$data.ws.close()
+    }
   },
   activated(){
     if ("source" in this.$route.query && this.$route.query.source.config != null){
