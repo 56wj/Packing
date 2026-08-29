@@ -129,6 +129,15 @@
                 </el-switch>
               </el-form-item>
             </el-col>
+            <el-col :span=16 class="data-import-actions">
+              <el-upload class="filter-item" name="file" action="string" :on-error="uploadFalse"
+                :on-success="uploadSuccess" :on-change="get_content" :before-upload="beforeAvatarUpload"
+                ref="upload" accept=".xlsx,.xls" :show-file-list="false" :file-list="fileList"
+                :http-request="uploadData" :auto-upload="false">
+                <el-button slot="trigger" icon="el-icon-upload2" type="primary">货物数据上传</el-button>
+              </el-upload>
+              <el-button icon="el-icon-download" @click="historyExportVisible = true">历史订单导出</el-button>
+            </el-col>
           </el-row>
           <el-table :data="pageData" style="width: 100%;" height=530px>
             <el-table-column prop="name" label="品名" width="240">
@@ -207,16 +216,7 @@
                 <div v-else class="txt">{{ scope.row.priority }}</div>
               </template>
             </el-table-column> -->
-            <el-table-column fixed="right" width="200">
-              <template slot="header" slot-scope="scope">
-                <el-upload class="filter-item" name="file" action="string" :on-error="uploadFalse"
-                  :on-success="uploadSuccess" :on-change="get_content" :before-upload="beforeAvatarUpload"
-                  ref="upload" accept=".xlsx,.xls" :show-file-list="false" :file-list="fileList"
-                  :http-request="uploadData" :auto-upload="false">
-                  <el-button slot="trigger" style="margin-left: 10px;" icon="el-icon-edit"
-                    type="primary">货物数据上传</el-button>
-                </el-upload>
-              </template>
+            <el-table-column fixed="right" label="操作" width="200">
               <template slot-scope="scope">
                 <el-button size="mini" v-if="scope.row.isEdit"
                   @click="handleSave(scope.$index, scope.row)">保存</el-button>
@@ -273,6 +273,10 @@
         <el-button type="primary" @click="submitDialog" :loading="loading2" :disabled="oneEdit2">{{ loading2 ? '计算中' : '确定' }}</el-button>
       </span>
     </el-dialog>
+    <historical-order-export-dialog
+      :visible.sync="historyExportVisible"
+      task-type="悬空装箱"
+    />
   </div>
 </template>
 
@@ -288,9 +292,11 @@ import { palletDataCheck }from '@/utils/inputCheck'
 import { get_task } from '@/api/external'
 import { exit } from 'process'
 import ReconnectingWebSocket, { buildWebSocketUrl } from '@/utils/reconnectingWebSocket'
+import HistoricalOrderExportDialog from '@/components/HistoricalOrderExportDialog'
 
 export default {
   name: 'get_data',
+  components: { HistoricalOrderExportDialog },
   data() {
     return {
       activeName: 'first',
@@ -393,7 +399,8 @@ export default {
       ws: "",
       box_id: '',
       taskId: '',
-      dialog: []
+      dialog: [],
+      historyExportVisible: false
     }
   },
   methods: {
@@ -964,6 +971,14 @@ export default {
 .el-tab-pane {
   height: 600px;
   overflow-y: auto;
+}
+
+.data-import-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  padding-right: 20px;
 }
 
 // .el-form-item {
