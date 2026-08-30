@@ -223,6 +223,15 @@
                 </el-switch>
               </el-form-item>
             </el-col>
+            <el-col :span=16 class="data-import-actions">
+              <el-upload class="filter-item" name="file" action="string" :on-error="uploadFalse"
+                :on-success="uploadSuccess" :on-change="get_content" :before-upload="beforeAvatarUpload"
+                ref="upload" accept=".xlsx,.xls" :show-file-list="false" :file-list="fileList"
+                :http-request="uploadData" :auto-upload="false">
+                <el-button slot="trigger" icon="el-icon-upload2" type="primary">货物数据上传</el-button>
+              </el-upload>
+              <el-button icon="el-icon-download" @click="historyExportVisible = true">历史订单导出</el-button>
+            </el-col>
           </el-row>
           <el-table :data="pageData" style="width: 100%;" height=530px>
             <el-table-column prop="name" label="品名" width="240">
@@ -301,16 +310,7 @@
                 <div v-else class="txt">{{ scope.row.priority }}</div>
               </template>
             </el-table-column> -->
-            <el-table-column fixed="right" width="200">
-              <template slot="header" slot-scope="scope">
-                <el-upload class="filter-item" name="file" action="string" :on-error="uploadFalse"
-                  :on-success="uploadSuccess" :on-change="get_content" :before-upload="beforeAvatarUpload"
-                  ref="upload" accept=".xlsx,.xls" :show-file-list="false" :file-list="fileList"
-                  :http-request="uploadData" :auto-upload="false">
-                  <el-button slot="trigger" style="margin-left: 10px;" icon="el-icon-edit"
-                    type="primary">货物数据上传</el-button>
-                </el-upload>
-              </template>
+            <el-table-column fixed="right" label="操作" width="200">
               <template slot-scope="scope">
                 <el-button size="mini" v-if="scope.row.isEdit"
                   @click="handleSave(scope.$index, scope.row)">保存</el-button>
@@ -371,6 +371,10 @@
         <el-button type="primary" @click="submitDialog" :loading="loading2" :disabled="oneEdit2">{{ loading2 ? '计算中' : '确定' }}</el-button>
       </span>
     </el-dialog>
+    <historical-order-export-dialog
+      :visible.sync="historyExportVisible"
+      task-type="托盘装箱"
+    />
   </div>
 </template>
 
@@ -387,10 +391,13 @@ import { palletDataCheck }from '@/utils/inputCheck'
 import { create_palletroll } from '@/api/rollPallet'
 import { get_task } from '@/api/external'
 import { heightCmToMm, validateOverlapConfig, validateOverlapHeightValue } from '@/utils/overlapValidation'
+import ReconnectingWebSocket, { buildWebSocketUrl } from '@/utils/reconnectingWebSocket'
+import HistoricalOrderExportDialog from '@/components/HistoricalOrderExportDialog'
 
 
 export default {
   name: 'get_data',
+  components: { HistoricalOrderExportDialog },
   data() {
     const overlapHeightValidator = (fieldLabel) => (rule, value, callback) => {
       if (!this.form.overlap) {
@@ -519,7 +526,8 @@ export default {
       box_max_height: '',
       taskId: '',
       dialog: [],
-      trayId: ''
+      trayId: '',
+      historyExportVisible: false
     }
   },
   methods: {
@@ -1075,54 +1083,44 @@ export default {
       }
     },
     web_socket() {
-      var that = this
-      // 如果文件上传成功了 （后续此处补上文件是否上传成功、是否上传的判断）
-      if (typeof (WebSocket) == "undefined") {
-        alert("您的浏览器不支持WebSocket");
-        this.$data.wsp = true;
-        console.log("您的浏览器不支持WebSocket");
-      } else {
-        console.log("您的浏览器支持WebSocket");
+      const that = this
+      if (typeof WebSocket === 'undefined') {
+        this.$data.wsp = true
+        this.$message.error('当前浏览器不支持 WebSocket')
+        return
       }
-      // var ws = new WebSocket('ws://10.131.131.164:8101/palletpacking/1');
-      // var wsUrl = 'ws://10.131.131.132:8101/palletpackingWebsocket?token=' + getToken();
-      // var wsUrl = 'ws://106.12.166.210:9001/palletpackingWebsocket?token=' + getToken();
-      // var wsUrl = 'ws://192.168.20.172:9527/palletpackingWebsocket?token=' + getToken();
-      var wsUrl = process.env.VUE_APP_WS_URL+'palletpackingWebsocket?token=' + getToken();
-      var ws = new WebSocket(wsUrl);
 
-      var heartCheck = {
-        // 9分钟发起一次心跳，比Server端设置的连接时间稍微小一点，在接近断开的情况下以通信的方式去重置连接时间
-        timeout: 550000,
-        serverTimeoutObj: null,
-        reset: function () {
-            clearTimeout(this.serverTimeoutObj);
-            return this;
+      if (this.$data.ws && typeof this.$data.ws.close === 'function') {
+        this.$data.ws.close()
+      }
+      this.$data.wsp = true
+
+      const client = new ReconnectingWebSocket({
+        url: () => buildWebSocketUrl('/palletpackingWebsocket', getToken()),
+        onOpen: socket => {
+          console.log('WebSocket connected')
+          socket.send('from client: hello')
         },
-        start: function () {
-            this.serverTimeoutObj = setInterval(function () {
-                if (ws.readyState == 1) {
-                    console.log("连接状态，发送消息保持连接");
-                    ws.send("linkCheck");
-                    // 如果获取到消息，说明连接正常，重置心跳检测
-                    heartCheck.reset().start();
-                } else {
-                    console.log("断开连接，尝试重连");
-                    connect();
-                }
-            }, this.timeout)
-        }
-      };
-
-      this.$data.ws = ws
-      ws.onopen = function () {
-        console.log('ws onopen');
-        ws.send('from client: hello');
-      };
-      ws.onmessage = function (e) {
-        console.log('ws onmessage');
-        console.log(JSON.parse(e.data))
-        var res = JSON.parse(e.data)
+        onStatusChange: connected => {
+          that.$data.wsp = !connected
+        },
+        onReconnect: retryCount => {
+          if (retryCount === 1) {
+            that.$message({
+              message: 'WebSocket 连接中断，正在自动重连…',
+              type: 'warning',
+              duration: 3000
+            })
+          }
+        },
+        onMessage: e => {
+          let res
+          try {
+            res = JSON.parse(e.data)
+          } catch (error) {
+            console.error('WebSocket 消息解析失败', error, e.data)
+            return
+          }
         // 这里要做一个code的判断 一阶段
         if (res.code == 10001 && res.data.taskId == that.$data.taskId) {
           var data = JSON.parse(res.data.result);
@@ -1161,14 +1159,11 @@ export default {
           that.$data.loading2 = false;
           that.$data.dialogTableVisible = false;
         }
-      };
-      ws.onclose = function () {
-      };
-      ws.onerror = function (error) {
-        alert("wsl连接失败，请刷新页面重试");
-        that.$data.wsp = true;
-        console.log(error)
-      }
+        }
+      })
+
+      this.$data.ws = client
+      client.connect()
     }
   },
   created() {
@@ -1183,6 +1178,11 @@ export default {
   },
   mounted() {
     this.web_socket()
+  },
+  beforeDestroy() {
+    if (this.$data.ws && typeof this.$data.ws.close === 'function') {
+      this.$data.ws.close()
+    }
   },
   activated(){
     if ("source" in this.$route.query && this.$route.query.source.config != null){
@@ -1226,6 +1226,14 @@ export default {
   margin-left: 8px;
   color: #606266;
   white-space: nowrap;
+}
+
+.data-import-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  padding-right: 20px;
 }
 
 // .el-form-item {

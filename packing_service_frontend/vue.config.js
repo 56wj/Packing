@@ -48,6 +48,16 @@ module.exports = {
           ['^' + process.env.VUE_APP_BASE_API]: ''
         }
       },
+      '/palletpackingWebsocket': {
+        target: process.env.VUE_APP_WS_PROXY_TARGET || process.env.VUE_APP_PROXY_TARGET || 'http://10.131.131.110:8101',
+        changeOrigin: true,
+        ws: true
+      },
+      '/suspendpackingWebsocket': {
+        target: process.env.VUE_APP_WS_PROXY_TARGET || process.env.VUE_APP_PROXY_TARGET || 'http://10.131.131.110:8101',
+        changeOrigin: true,
+        ws: true
+      },
       '/images': {
         target: process.env.VUE_APP_ASSET_PROXY_TARGET || process.env.VUE_APP_HTTP_URL || 'http://localhost:5001',
         changeOrigin: true
